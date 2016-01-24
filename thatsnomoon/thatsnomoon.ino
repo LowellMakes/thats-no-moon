@@ -1,32 +1,44 @@
-
 // thats no moon
 
-#define TRIGGER_PIN 6
-#define ECHO_PIN 7
+#define TRIGGER_PIN A0
+#define ECHO_PIN A1
 
 #define FAR_LIMIT 200
 
-#define FORWARD_PIN 3
-#define REVERSE_PIN 9
-
 #define SPEED 50
 
-#define OPEN_TIME (6 * 1000)
-#define CLOSE_TIME (6 * 1000)
+#define MAX_DISTANCE      300
+
+#define OPEN_TIME (2 * 1200)
+#define CLOSE_TIME (2 * 1200)
+
+#include <Servo.h>
+#include <NewPing.h>
+
+// Forward declarations
+int ping_cm_BugFix();
+
+
+NewPing sonar(TRIGGER_PIN, ECHO_PIN, MAX_DISTANCE);
+Servo servo;
 
 void motor_forward(){
-  analogWrite(FORWARD_PIN, SPEED);
-  analogWrite(REVERSE_PIN, 0);
+  servo.attach(10);
+  servo.write(0);
+  Serial.println("Forward");
 }
 
 void motor_reverse(){
-  analogWrite(FORWARD_PIN, 0);
-  analogWrite(REVERSE_PIN, SPEED);  
+  servo.attach(10);
+  servo.write(180);
+  Serial.println("Reverse");
+  
 }
 
 void motor_stop(){
-  analogWrite(FORWARD_PIN, 0);
-  analogWrite(REVERSE_PIN, 0);  
+  servo.write(93);
+  Serial.println("Stopped");
+  servo.detach();
 }
 
 void trigger() {
@@ -43,9 +55,11 @@ void trigger() {
 int ball_open = false;
 void open_ball(){
   if(!ball_open){
+    Serial.println("Opening");
     motor_forward();
     delay(OPEN_TIME);
     motor_stop();
+    delay(2000);
     ball_open = true;
   }
     
@@ -54,9 +68,11 @@ void open_ball(){
 void close_ball(){
   //ball_open=false;
   if(ball_open){
+    Serial.println("Closing");
     motor_reverse();
     delay(CLOSE_TIME);
     motor_stop();
+    delay(2000);
     ball_open = false;
   }
 }
@@ -67,44 +83,50 @@ void setup() {
   Serial.println("Begin");
   pinMode(ECHO_PIN, INPUT);
   pinMode(TRIGGER_PIN, OUTPUT);
-  pinMode(FORWARD_PIN, OUTPUT);
-  pinMode(REVERSE_PIN, OUTPUT);
+  servo.attach(10);
+//  servo.write(93);
 }
 
 void loop() {
+
   long duration = 0;
   int distInCentimeters = 0;
+  int k;
 
-  Serial.println("Trigger");
-  
-  trigger();
-  duration = pulseIn(ECHO_PIN, HIGH);
-  Serial.print("Duration = ");
-  Serial.print(duration);
-  Serial.println();
-  distInCentimeters = microsecondsToCentimeters(duration);
-  
-  // could be stuck, run the work around just in case.
-  if ( distInCentimeters == 0 ) {
-      delay(100);
-      pinMode(ECHO_PIN, OUTPUT);
-      digitalWrite(ECHO_PIN, LOW);
-      delay(100);
-      pinMode(ECHO_PIN, INPUT);
-  } else {
+  distInCentimeters = ping_cm_BugFix();
+
     Serial.print("cm = ");
     Serial.print(distInCentimeters);
     Serial.println();
-  
-    if(distInCentimeters < FAR_LIMIT){
-      open_ball();
+    
+    if(distInCentimeters < 10){
+     delay(100);
     }
-    else {
-      close_ball();
-    } 
+    else if(distInCentimeters < FAR_LIMIT){
+     open_ball();
+    }
+    else if(distInCentimeters > FAR_LIMIT){
+     close_ball();
+    }
   }
-}
 
 long microsecondsToCentimeters(long microseconds) {
   return microseconds / 29 / 2;
+}
+
+// This is a wrapper function that tries to avoid a bug with the
+// HC-SR04 modules where they can get stuck return zero forever
+int ping_cm_BugFix(){
+  
+        int distCm = sonar.ping_cm();
+        
+        if(distCm == 0){
+          delay(100);
+          pinMode(ECHO_PIN, OUTPUT);
+          digitalWrite(ECHO_PIN, LOW);
+          delay(100);
+          pinMode(ECHO_PIN, INPUT);
+        }
+
+        return distCm;
 }
