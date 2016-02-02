@@ -1,44 +1,30 @@
-#define USE_PING
+/*
+*
+* thatsnomoon
+* Uses a servo to open and close an IKEA light based on motion detection.
+* 
+* 
+*/
 
-#ifdef USE_PING
-#include <NewPing.h>
-#endif
-
-// thats no moon
-
-#define TRIGGER_PIN A0
-#define ECHO_PIN A1
-
+#define PIR_PIN A0
+#define PIR_CAL_TIME 30 //PIR Calibration time in seconds, datasheet says 10-60 seconds
+//close and open pins are connected to limit switches 
 #define CLOSE_PIN 4
 #define OPEN_PIN  5
 
-#define FAR_LIMIT 125
+#define MIN_TIME_FOR_OPEN_BALL (5 * 1000) //min time for the ball to be open in milli seconds
 
-#define SPEED 50
-
-#define MAX_DISTANCE      500
-#define BAD_READING 500
-
-#define MAX_OPEN_CLOSE_TIME 50
+#define MAX_OPEN_CLOSE_TIME (5 * 1000) //max time to open or close the ball in seconds, this is a safety incase the limit switch doesn't engage 
 
 #define CLOCK_WISE 180
 #define STOP 93
 #define COUNTER_CLOCK_WISE 0
 
 #include <Servo.h>
-#include <NewPing.h>
-#include <RunningAverage.h>
-
-
-// Forward declarations
-int ping_cm_BugFix();
 
 int initialDirection = 0;
-
-NewPing sonar(TRIGGER_PIN, ECHO_PIN, MAX_DISTANCE);
-RunningAverage distanceRA(10);
+int timeBallOpened = 0;
 Servo servo;
-
 
 void move_motor(int dir){
   servo.attach(10);
@@ -58,6 +44,7 @@ void motor_stop(){
 void open_ball(){
   if(ball_is_open()){
     Serial.println("Already Opened");
+    timeBallOpened = millis();
   } else {
   
     move_motor(initialDirection);
@@ -69,7 +56,7 @@ void open_ball(){
     while(!ball_is_open() && (timeout > 0)){
       Serial.println("Opening");
       timeout--;
-      delay(100);
+      delay(1);
       if(ball_is_closed()){
         initialDirection != initialDirection;   
       }
@@ -78,6 +65,7 @@ void open_ball(){
     motor_stop();
     delay(250); 
     if(ball_is_open()){
+      timeBallOpened = millis();
       Serial.println("Opened");
     }
   }
@@ -95,7 +83,7 @@ void close_ball(){
     
     while(!ball_is_closed() && (timeout > 0)){
         timeout--;
-        delay(100);
+        delay(1);
         if(ball_is_open()){
           initialDirection != initialDirection;   
         }
@@ -120,90 +108,64 @@ bool ball_is_open(){
   return !digitalRead(OPEN_PIN);
 }
 
+/*
+  this will check if the ball is open and for how long, if there is no longer
+  motion detected and the ball has been open for the set amount of time, it will
+  return true to close the ball, otherwise it will return false
+*/
+bool should_close_ball(){
+  int timeBallHasBeenOpened = millis() - timeBallOpened;
+
+  if((pir_motion_detected() == false) &&
+    (timeBallHasBeenOpened > MIN_TIME_FOR_OPEN_BALL)){
+    return true;
+  }
+  return false;
+}
+
+// PIR methods
+/*
+  This will wait the calibration time, before allow motion to be detected
+*/
+void pir_init(){
+  for(int i=0; i < PIR_CAL_TIME; i++){
+    Serial.println("Calibrating PIR");
+    delay(1000);
+  }
+  Serial.println("PIR Calibrated");
+}
+
+bool pir_motion_detected(){
+  if(digitalRead(PIR_PIN) == HIGH){
+    return true;
+  }
+  return false;
+}
+
 void setup() {
   Serial.begin(9600);
   Serial.println("Begin");
-  pinMode(ECHO_PIN, INPUT);
-  pinMode(TRIGGER_PIN, OUTPUT);
+  //initialize IO
+  pinMode(PIR_PIN, INPUT);
   pinMode(CLOSE_PIN, INPUT);
   pinMode(OPEN_PIN, INPUT);
-  servo.attach(10);
-  distanceRA.clear(); //clear the running average
 
+  servo.attach(10);
+  pir_init();
+  //initally close the ball
   close_ball();
 }
 
 int oldDistInCentimeters = 0;
 
 void loop() {
-
-  long duration = 0;
-  int distInCentimeters = 0;
-  int k;
-
-  delay(150);
-  
-  distInCentimeters = ping_cm_BugFix();
-
-  if(distInCentimeters == oldDistInCentimeters){
-    return;
-  } else {
-    oldDistInCentimeters = distInCentimeters; 
-  }
-  
-  while(distInCentimeters == BAD_READING){
-    Serial.println("Bad Reading");
-    if(ball_is_open()){
-      close_ball();
-    }
-    distInCentimeters = ping_cm_BugFix();
-    
-  }
-  
-//  distanceRA.addValue(distInCentimeters);
-//  distInCentimeters = distanceRA.getAverage();
-  
-  Serial.print("cm = ");
-  Serial.print(distInCentimeters);
-  Serial.println();
       
-  if(ball_is_closed()){
-    Serial.println("Ball is closed");
-  } 
-
-  if(ball_is_open()){
-    Serial.println("Ball is opened");
-  }
-
-  if(distInCentimeters < FAR_LIMIT){
+  if(pir_motion_detected()){
+    Serial.println("Detected Motion");
     open_ball();
-    Serial.println(distInCentimeters);
-    Serial.println(" ");
   }
-  else if(distInCentimeters > FAR_LIMIT){
-    Serial.println(distInCentimeters);
+
+  if(should_close_ball()) {
     close_ball();
-    Serial.println(" ");
   }
-}
-
-long microsecondsToCentimeters(long microseconds) {
-  return microseconds / 29 / 2;
-}
-
-// This is a wrapper function that tries to avoid a bug with the
-// HC-SR04 modules where they can get stuck return zero forever
-int ping_cm_BugFix(){
-  
-  long echoTime = sonar.ping();
-
-  while(echoTime == 0){
-    delay(100);
-    pinMode(ECHO_PIN, OUTPUT);
-    digitalWrite(ECHO_PIN, LOW);
-    delay(100);
-    pinMode(ECHO_PIN, INPUT);
-    return BAD_READING;
-  }
-  return sonar.convert_cm(echoTime);
 }
