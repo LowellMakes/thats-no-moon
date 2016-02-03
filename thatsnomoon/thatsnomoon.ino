@@ -12,7 +12,7 @@
 #define CLOSE_PIN 4
 #define OPEN_PIN  5
 
-#define MIN_TIME_FOR_OPEN_BALL (5 * 1000) //min time for the ball to be open in milli seconds
+#define MIN_TIME_FOR_OPEN_BALL (2 * 1000) //min time for the ball to be open in milli seconds
 
 #define MAX_OPEN_CLOSE_TIME (5 * 1000) //max time to open or close the ball in seconds, this is a safety incase the limit switch doesn't engage 
 
@@ -39,6 +39,7 @@ void motor_stop(){
   servo.write(STOP);
   Serial.println("Stopped");
   servo.detach();
+//  delay(2000);
 }
 
 void open_ball(){
@@ -63,7 +64,7 @@ void open_ball(){
     }
   
     motor_stop();
-    delay(250); 
+//    delay(250); 
     if(ball_is_open()){
       timeBallOpened = millis();
       Serial.println("Opened");
@@ -94,18 +95,19 @@ void close_ball(){
     delay(250);  
     if(ball_is_closed()){
       Serial.println("Closed");
+      delay(5000);
     }
   }
 }
 
 bool ball_is_closed(){
-  Serial.println("top pin");
   return !digitalRead(CLOSE_PIN);
+  Serial.println("top pin");
 }
 
 bool ball_is_open(){
-  Serial.println("bottom pin");
   return !digitalRead(OPEN_PIN);
+  Serial.println("bottom pin");
 }
 
 /*
@@ -118,6 +120,7 @@ bool should_close_ball(){
 
   if((pir_motion_detected() == false) &&
     (timeBallHasBeenOpened > MIN_TIME_FOR_OPEN_BALL)){
+    Serial.println("slept for 1 second");
     return true;
   }
   return false;
