@@ -7,7 +7,7 @@
 */
 
 #define PIR_PIN A0
-#define PIR_CAL_TIME 30 //PIR Calibration time in seconds, datasheet says 10-60 seconds
+#define PIR_CAL_TIME 10 //PIR Calibration time in seconds, datasheet says 10-60 seconds
 //close and open pins are connected to limit switches 
 #define CLOSE_PIN 4
 #define OPEN_PIN  5
@@ -64,7 +64,7 @@ void open_ball(){
     }
   
     motor_stop();
-//    delay(250); 
+    delay(500); 
     if(ball_is_open()){
       timeBallOpened = millis();
       Serial.println("Opened");
