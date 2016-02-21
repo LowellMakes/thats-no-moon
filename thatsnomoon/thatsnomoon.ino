@@ -23,7 +23,7 @@
 #include <Servo.h>
 
 int initialDirection = 0;
-int timeBallOpened = 0;
+unsigned long timeBallOpened = 0;
 Servo servo;
 
 void move_motor(int dir){
@@ -116,7 +116,7 @@ bool ball_is_open(){
   return true to close the ball, otherwise it will return false
 */
 bool should_close_ball(){
-  int timeBallHasBeenOpened = millis() - timeBallOpened;
+  unsigned long timeBallHasBeenOpened = millis() - timeBallOpened;
 
   if((pir_motion_detected() == false) &&
     (timeBallHasBeenOpened > MIN_TIME_FOR_OPEN_BALL)){
